@@ -60,7 +60,9 @@ class CategoryClassifier:
         self,
         text: str,
         top_k: int = 3,
-        threshold: float = 0.1
+        threshold: float = 0.1,
+        categories: Optional[List[str]] = None,
+        hypothesis_template: str = "This text is about {}."
     ) -> Dict[str, any]:
         """
         Classify text into categories
@@ -85,12 +87,15 @@ class CategoryClassifier:
             }
         
         try:
+            # Use provided categories or default ones
+            target_categories = categories or self.categories
+            
             # Use zero-shot classification approach
             scores = []
             
-            for category in self.categories:
+            for category in target_categories:
                 # Create hypothesis for zero-shot classification
-                hypothesis = f"This text is about {category.lower()}."
+                hypothesis = hypothesis_template.format(category.lower())
                 
                 # Tokenize
                 inputs = self.tokenizer(
@@ -119,7 +124,7 @@ class CategoryClassifier:
             top_indices = np.argsort(scores)[::-1][:top_k]
             top_categories = [
                 {
-                    "category": self.categories[idx],
+                    "category": target_categories[idx],
                     "confidence": float(scores[idx])
                 }
                 for idx in top_indices
@@ -128,7 +133,7 @@ class CategoryClassifier:
             
             # Get primary category
             primary_idx = top_indices[0]
-            primary_category = self.categories[primary_idx]
+            primary_category = target_categories[primary_idx]
             primary_confidence = float(scores[primary_idx])
             
             logger.info(f"Classified as '{primary_category}' with confidence {primary_confidence:.3f}")
