@@ -3,7 +3,7 @@ Utility functions for AI service
 """
 import os
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from loguru import logger
 import numpy as np
 from datetime import datetime
@@ -184,3 +184,6 @@ def get_device() -> str:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Using device: {device}")
     return device
+
+
+# 189: Removed SourceChecker class from here as it now lives in its own module: ai_service.utils.source_checker

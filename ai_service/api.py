@@ -12,6 +12,8 @@ import uvicorn
 from ai_service.pipelines.classify import ClassificationPipeline
 from ai_service.pipelines.summarize import SummarizationPipeline
 from ai_service.pipelines.cluster import ClusteringPipeline
+from ai_service.pipelines.verification import VerificationPipeline
+from ai_service.pipelines.fact_check import FactCheckPipeline
 from ai_service.utils import setup_logging
 
 
@@ -38,6 +40,8 @@ app.add_middleware(
 classification_pipeline = None
 summarization_pipeline = None
 clustering_pipeline = None
+verification_pipeline = None
+factcheck_pipeline = None
 
 
 # Request/Response Models
@@ -104,6 +108,20 @@ class SimilarityRequest(BaseModel):
     threshold: float = Field(0.5, description="Minimum similarity threshold", ge=0.0, le=1.0)
 
 
+class VerificationRequest(BaseModel):
+    text: str = Field(..., description="Text to verify", min_length=10)
+    source_url: Optional[str] = Field(None, description="URL of the news source")
+
+class VerificationResponse(BaseModel):
+    success: bool
+    status: str
+    confidence: float
+    is_reliable: bool
+    explanation: Optional[str] = None
+    error: Optional[str] = None
+    details: Optional[dict] = None
+
+
 # Helper functions
 def get_classification_pipeline():
     global classification_pipeline
@@ -128,6 +146,20 @@ def get_clustering_pipeline():
         clustering_pipeline = ClusteringPipeline()
     return clustering_pipeline
 
+def get_verification_pipeline():
+    global verification_pipeline
+    if verification_pipeline is None:
+        logger.info("Initializing Verification Pipeline (Lazy Loading)...")
+        verification_pipeline = VerificationPipeline()
+    return verification_pipeline
+
+def get_factcheck_pipeline():
+    global factcheck_pipeline
+    if factcheck_pipeline is None:
+        logger.info("Initializing Fact-Check Pipeline (Lazy Loading)...")
+        factcheck_pipeline = FactCheckPipeline()
+    return factcheck_pipeline
+
 
 # API Endpoints
 @app.get("/")
@@ -142,7 +174,9 @@ async def root():
             "summarize": "/api/summarize",
             "batch_summarize": "/api/summarize/batch",
             "cluster": "/api/cluster",
-            "similarity": "/api/similarity"
+            "similarity": "/api/similarity",
+            "verify_news": "/api/verify/news",
+            "verify_report": "/api/verify/report"
         }
     }
 
@@ -313,6 +347,67 @@ async def find_similar_texts(request: SimilarityRequest):
         }
     except Exception as e:
         logger.error(f"Similarity endpoint error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.post("/api/verify/news", response_model=VerificationResponse)
+async def verify_news_credibility(request: VerificationRequest):
+    """
+    Verify the credibility of a news article
+    """
+    try:
+        pipeline = get_verification_pipeline()
+        result = pipeline.verify_news(
+            text=request.text,
+            source_url=request.source_url
+        )
+        return VerificationResponse(**result)
+    except Exception as e:
+        logger.error(f"News verification error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@app.post("/api/verify/report", response_model=VerificationResponse, tags=["Verification"])
+async def verify_civic_report(request: VerificationRequest):
+    """
+    Verify if a civic report is valid (Actionable) or Spam/Nonsense
+    """
+    try:
+        pipeline = get_verification_pipeline()
+        result = pipeline.verify_report(request.text)
+        
+        return VerificationResponse(
+            success=True,
+            status=result["status"],
+            is_reliable=result["is_reliable"],
+            confidence=result.get("confidence", 0.0),
+            explanation=result.get("explanation", None)
+        )
+    except Exception as e:
+        logger.error(f"Report verification error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@app.post("/api/verify/factcheck", tags=["Verification"])
+async def fact_check_news(request: VerificationRequest):
+    """
+    Deep verification by searching the internet for sources.
+    Returns found sources and verification status.
+    """
+    try:
+        pipeline = get_factcheck_pipeline()
+        result = pipeline.verify_claim(request.text)
+        return result
+    except Exception as e:
+        logger.error(f"Fact-checking endpoint error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
