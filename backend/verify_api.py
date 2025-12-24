@@ -2,7 +2,7 @@ import requests
 import time
 import sys
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:8001"
 
 def wait_for_server():
     print("Waiting for server to start...")

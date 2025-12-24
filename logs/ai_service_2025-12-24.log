@@ -40,3 +40,40 @@
 2025-12-24 14:29:56 | INFO | ai_service.models.summarizer:summarize:114 | Generated summary: 219 chars from 528 chars (ratio: 0.41)
 2025-12-24 14:30:05 | INFO | ai_service.models.classifier:classify:134 | Classified as 'Environment' with confidence 0.504
 2025-12-24 14:30:11 | INFO | ai_service.models.summarizer:summarize:114 | Generated summary: 251 chars from 529 chars (ratio: 0.47)
+2025-12-24 16:23:00 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:23:40 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:35:26 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:36:17 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:36:33 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:36:33 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:44:14 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:44:14 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:55:37 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:55:37 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:59:10 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:59:25 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 16:59:25 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:05:09 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:05:23 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:05:23 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:06:57 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:07:11 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:07:11 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:11:08 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:11:22 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:11:22 | INFO | ai_service.utils:setup_logging:147 | Logging initialized at INFO level
+2025-12-24 17:12:35 | INFO | ai_service.api:get_classification_pipeline:111 | Initializing classification pipeline
+2025-12-24 17:12:35 | INFO | ai_service.utils:get_device:185 | Using device: cpu
+2025-12-24 17:12:35 | INFO | ai_service.models.classifier:__init__:47 | Loading classifier model: facebook/bart-large-mnli
+2025-12-24 17:12:37 | INFO | ai_service.models.classifier:__init__:54 | Classifier loaded successfully on cpu
+2025-12-24 17:12:37 | INFO | ai_service.pipelines.classify:__init__:41 | Classification pipeline initialized
+2025-12-24 17:12:40 | INFO | ai_service.models.classifier:classify:134 | Classified as 'Other' with confidence 0.505
+2025-12-24 17:12:42 | INFO | ai_service.api:get_summarization_pipeline:119 | Initializing summarization pipeline
+2025-12-24 17:12:42 | INFO | ai_service.utils:get_device:185 | Using device: cpu
+2025-12-24 17:12:42 | INFO | ai_service.models.summarizer:__init__:34 | Loading summarization model: facebook/bart-large-cnn
+2025-12-24 17:12:46 | INFO | ai_service.models.summarizer:__init__:41 | Summarizer loaded successfully on cpu
+2025-12-24 17:12:46 | INFO | ai_service.pipelines.summarize:__init__:38 | Summarization pipeline initialized
+2025-12-24 17:12:51 | INFO | ai_service.models.summarizer:summarize:114 | Generated summary: 160 chars from 78 chars (ratio: 2.05)
+2025-12-24 17:12:51 | INFO | ai_service.pipelines.summarize:process:74 | Returning cached summarization result
+2025-12-24 17:13:02 | INFO | ai_service.pipelines.classify:process:78 | Returning cached classification result
+2025-12-24 17:13:04 | INFO | ai_service.models.summarizer:summarize:114 | Generated summary: 143 chars from 170 chars (ratio: 0.84)

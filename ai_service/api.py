@@ -322,9 +322,9 @@ async def find_similar_texts(request: SimilarityRequest):
 # Run server
 if __name__ == "__main__":
     uvicorn.run(
-        "api:app",
+        "ai_service.api:app",
         host="0.0.0.0",
-        port=8000,
+        port=8002,
         reload=True,
         log_level="info"
     )

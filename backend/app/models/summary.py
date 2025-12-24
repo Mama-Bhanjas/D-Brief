@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, ARRAY
+from sqlalchemy import Column, Integer, String, Text, Float, JSON
 from ..database import Base
 
 class Summary(Base):
@@ -8,4 +8,4 @@ class Summary(Base):
     category = Column(String, nullable=False)
     summary_text = Column(Text, nullable=False)
     reputation_score = Column(Float, default=0.0)
-    report_ids = Column(ARRAY(Integer), nullable=True) # Storing list of report IDs that contributed to this summary
+    report_ids = Column(JSON, nullable=True) # Storing list of report IDs that contributed to this summary
