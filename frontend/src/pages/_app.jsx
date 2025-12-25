@@ -1,62 +1,44 @@
 import '../styles/globals.css';
-import '@mysten/dapp-kit/dist/index.css';
-import { createNetworkConfig, SuiClientProvider, WalletProvider } from '@mysten/dapp-kit';
-import { getFullnodeUrl } from '@mysten/sui/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SuiWalletProvider } from '../context/SuiWalletContext';
 import { AppProvider } from '../context/AppContext';
-import { WalletProvider as LocalWalletProvider } from '../context/WalletContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { AuthProvider } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Outfit } from 'next/font/google';
+import { Roboto } from 'next/font/google';
 
-const outfit = Outfit({
+const roboto = Roboto({
     subsets: ['latin'],
-    variable: '--font-outfit',
+    weight: ['300', '400', '500', '700'],
+    variable: '--font-roboto',
+    display: 'swap',
 });
 
-// Config options for the networks you want to connect to
-const { networkConfig } = createNetworkConfig({
-    testnet: { url: getFullnodeUrl('testnet') },
-    mainnet: { url: getFullnodeUrl('mainnet') },
-});
-
-const queryClient = new QueryClient();
 
 function MyApp({ Component, pageProps, router }) {
     return (
-        <QueryClientProvider client={queryClient}>
-            <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
-                <WalletProvider>
-                    <SuiWalletProvider>
-                        <LocalWalletProvider>
-                            <AppProvider>
-                                <ThemeProvider>
-                                    <div className={`flex flex-col min-h-screen bg-surface-50 text-surface-900 ${outfit.variable} font-sans transition-colors duration-300 dark:bg-surface-950 dark:text-white`}>
-                                        <Navbar />
-                                        <AnimatePresence mode="wait">
-                                            <motion.main
-                                                key={router.route}
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -10 }}
-                                                transition={{ duration: 0.3 }}
-                                                className="flex-grow pt-20" // Padding top to account for fixed navbar
-                                            >
-                                                <Component {...pageProps} />
-                                            </motion.main>
-                                        </AnimatePresence>
-                                        <Footer />
-                                    </div>
-                                </ThemeProvider>
-                            </AppProvider>
-                        </LocalWalletProvider>
-                    </SuiWalletProvider>
-                </WalletProvider>
-            </SuiClientProvider>
-        </QueryClientProvider>
+        <AuthProvider>
+            <AppProvider>
+                <ThemeProvider>
+                    <div className={`flex flex-col min-h-screen bg-surface-50 text-surface-900 ${roboto.variable} font-sans transition-colors duration-300 dark:bg-surface-950 dark:text-white`}>
+                        <Navbar />
+                        <AnimatePresence mode="wait">
+                            <motion.main
+                                key={router.route}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.3 }}
+                                className="flex-grow pt-20"
+                            >
+                                <Component {...pageProps} />
+                            </motion.main>
+                        </AnimatePresence>
+                        <Footer />
+                    </div>
+                </ThemeProvider>
+            </AppProvider>
+        </AuthProvider>
     );
 }
 

@@ -29,32 +29,68 @@ class UnifiedProcessor:
         self._summarize = None
         self._ner = None
         self._verify = None
-        self.extractor = ContentExtractor()  # Initialize content extractor
+        self.extractor = ContentExtractor()
         
         logger.info("Unified Processor initialized")
 
     @property
     def classify_p(self):
         if self._classify is None:
-            self._classify = ClassificationPipeline(device=self.device)
+            import os
+            local_path = "ai_service/models/custom_classifier"
+            # If local doesn't exist, use Hugging Face repo
+            if os.path.exists(local_path):
+                model_path = local_path
+                logger.info(f"Using local fine-tuned Classification model from {model_path}")
+            else:
+                model_path = "Sachin1224/nepal-disaster-classifier"
+                logger.info(f"Using Hugging Face fine-tuned Classification model: {model_path}")
+                 
+            self._classify = ClassificationPipeline(model_name=model_path, device=self.device)
         return self._classify
 
     @property
     def summarize_p(self):
         if self._summarize is None:
-            self._summarize = SummarizationPipeline(device=self.device)
+            import os
+            local_path = "ai_service/models/custom_summarizer" 
+            if os.path.exists(local_path):
+                model_path = local_path
+                logger.info(f"Using local fine-tuned Summarization model from {model_path}")
+            else:
+                model_path = "Sachin1224/nepal-disaster-summarizer"
+                logger.info(f"Using Hugging Face fine-tuned Summarization model: {model_path}")
+
+            self._summarize = SummarizationPipeline(model_name=model_path, device=self.device)
         return self._summarize
 
     @property
     def ner_p(self):
         if self._ner is None:
-            self._ner = NERPipeline(device=self.device)
+            import os
+            local_path = "ai_service/models/custom_ner"
+            if os.path.exists(local_path):
+                model_path = local_path
+                logger.info(f"Using local fine-tuned NER model from {model_path}")
+                self._ner = NERPipeline(ner_model=model_path, device=self.device)
+            else:
+                model_path = "Sachin1224/nepal-disaster-ner"
+                logger.info(f"Using Hugging Face fine-tuned NER model: {model_path}")
+                self._ner = NERPipeline(ner_model=model_path, device=self.device)
         return self._ner
 
     @property
     def verify_p(self):
         if self._verify is None:
-            self._verify = VerificationPipeline() # Verification manages its own sub-pipelines
+            import os
+            local_path = "ai_service/models/custom_verifier"
+            if os.path.exists(local_path):
+                 logger.info(f"Using local fine-tuned Verification model from {local_path}")
+                 self._verify = VerificationPipeline(news_model_name=local_path)
+            else:
+                model_path = "Sachin1224/nepal-disaster-verifier"
+                logger.info(f"Using Hugging Face fine-tuned Verification model: {model_path}")
+                self._verify = VerificationPipeline(news_model_name=model_path)
         return self._verify
 
     def _clear_memory(self):
@@ -91,19 +127,40 @@ class UnifiedProcessor:
                 })
         return sorted(results, key=lambda x: x["similarity_score"], reverse=True)
 
-    def process_report(self, text: str, source_url: Optional[str] = None) -> Dict[str, any]:
+    def process_report(
+        self, 
+        text: Optional[str] = None, 
+        source_url: Optional[str] = None,
+        file_bytes: Optional[bytes] = None
+    ) -> Dict[str, any]:
         """
-        Run all analysis on a single report
+        Run all analysis on a single report. 
+        Input can be raw text, a URL (detected in text or source_url), or PDF bytes.
         """
         request_id = str(uuid.uuid4())
         logger.info(f"Processing report {request_id}")
         
         try:
-            # NEW: Check if text is actually a URL and extract content
+            # 0. Text Extraction
             extracted_text = None
             extraction_method = "direct"
+            actual_text = text
             
-            if self.extractor.is_url(text):
+            if file_bytes:
+                logger.info("Processing PDF file input")
+                extraction = self.extractor.extract_from_pdf(file_bytes)
+                if extraction["success"]:
+                    actual_text = extraction["text"]
+                    extracted_text = actual_text
+                    extraction_method = "pdf"
+                    logger.info(f"Successfully extracted {len(actual_text)} characters from PDF")
+                else:
+                    return {
+                        "success": False, 
+                        "report_id": request_id, 
+                        "error": f"PDF extraction failed: {extraction.get('error')}"
+                    }
+            elif self.extractor.is_url(text):
                 logger.info(f"Detected URL input, extracting content: {text}")
                 extraction = self.extractor.extract_from_url(text)
                 if extraction["success"]:
@@ -115,8 +172,13 @@ class UnifiedProcessor:
                 else:
                     logger.warning(f"URL extraction failed: {extraction.get('error')}, treating as regular text")
                     actual_text = text
-            else:
-                actual_text = text
+            
+            if not actual_text:
+                return {
+                    "success": False,
+                    "report_id": request_id,
+                    "error": "No content provided or extracted"
+                }
             
             # 1. Classification (General categories)
             cls_result = self.classify_p.process(actual_text)
@@ -144,6 +206,7 @@ class UnifiedProcessor:
                 
             # Combine into PostgreSQL-ready format
             output = {
+                "success": True,
                 "report_id": request_id,
                 "timestamp": datetime.datetime.now().isoformat(),
                 "original_text": text,
@@ -173,10 +236,7 @@ class UnifiedProcessor:
             }
             
             logger.info(f"Successfully processed report {request_id}")
-            return {
-                "success": True,
-                "data": output
-            }
+            return output
             
         except Exception as e:
             logger.error(f"Unified processing failed for {request_id}: {e}")

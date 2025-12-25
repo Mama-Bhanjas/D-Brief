@@ -3,11 +3,13 @@ FastAPI-based API for AI Service
 Exposes ML endpoints for classification, summarization, and clustering
 """
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from loguru import logger
 import uvicorn
+import datetime
+import os
 
 from ai_service.pipelines.classify import ClassificationPipeline
 from ai_service.pipelines.summarize import SummarizationPipeline
@@ -16,6 +18,8 @@ from ai_service.pipelines.verification import VerificationPipeline
 from ai_service.pipelines.fact_check import FactCheckPipeline
 from ai_service.pipelines.processor import UnifiedProcessor
 from ai_service.utils import setup_logging
+import asyncio
+import json
 
 
 # Initialize logging
@@ -44,6 +48,8 @@ clustering_pipeline = None
 verification_pipeline = None
 factcheck_pipeline = None
 unified_processor = None
+REALTIME_DATA_FILE = "ai_service/data/realtime_news.json"
+REFRESH_INTERVAL_SECONDS = 86400 # Refresh news once per day (every 24 hours)
 
 
 # Request/Response Models
@@ -430,19 +436,23 @@ async def fact_check_news(request: VerificationRequest):
         )
 
 
-@app.post("/api/process/report", response_model=UnifiedProcessResponse, tags=["Unified"])
+@app.post("/api/process/report", response_model=UnifiedProcessResponse, tags=["Unified"], status_code=status.HTTP_201_CREATED)
 async def process_full_report(request: VerificationRequest):
     """
     Unified endpoint that runs classification, summarization, NER, and verification
     in a single call. Returns structured data for DB storage and frontend.
+    Accepts raw text or a news link in the text field.
     """
+    logger.info(f"Received process report request. Text length: {len(request.text if request.text else '')}")
     try:
         processor = get_unified_processor()
         result = processor.process_report(
             text=request.text,
             source_url=request.source_url
         )
-        return UnifiedProcessResponse(**result)
+        if "error" in result:
+             return UnifiedProcessResponse(success=False, error=result["error"])
+        return UnifiedProcessResponse(success=True, data=result, report_id=result.get("report_id"))
     except Exception as e:
         logger.error(f"Unified processing endpoint error: {e}")
         raise HTTPException(
@@ -450,9 +460,118 @@ async def process_full_report(request: VerificationRequest):
             detail=str(e)
         )
 
+@app.post("/api/process/upload", response_model=UnifiedProcessResponse, tags=["Unified"], status_code=status.HTTP_201_CREATED)
+async def process_upload(file: UploadFile = File(...)):
+    """
+    Process an uploaded news article PDF.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported currently")
+        
+    try:
+        content = await file.read()
+        processor = get_unified_processor()
+        result = processor.process_report(file_bytes=content)
+        
+        if "error" in result:
+             return UnifiedProcessResponse(success=False, error=result["error"])
+             
+        return UnifiedProcessResponse(success=True, data=result, report_id=result.get("report_id"))
+    except Exception as e:
+        logger.error(f"File upload processing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/fetch/all", tags=["Fetching"])
+async def fetch_all_intelligence(news_api_key: Optional[str] = None):
+    """
+    Trigger the 4-Level Multi-Source Fetcher.
+    Polls BIPAD, ReliefWeb, USGS, and NewsData.io,
+    then runs AI verification on the news.
+    """
+    from ai_service.fetchers.orchestrator import MultiSourceFetcher
+    from dotenv import load_dotenv
+    
+    load_dotenv() # Load variables from .env
+    
+    # Priority: Function Argument -> Env Var -> Placeholder
+    key = news_api_key or os.getenv("NEWSDATA_API_KEY")
+    
+    if not key or key == "your_api_key_here":
+        logger.warning("Using free tier/public APIs where possible. NewsData.io requires a valid key.")
+        
+    fetcher = MultiSourceFetcher(news_api_key=key)
+    try:
+        results = fetcher.poll_all_sources()
+        return {
+            "success": True, 
+            "timestamp": datetime.datetime.now().isoformat(),
+            "data": results
+        }
+    except Exception as e:
+        logger.error(f"Fetch Cycle Failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def background_refresh_task():
+    """
+    Periodic task to refresh disaster intelligence from all sources.
+    Saves to a local file so the frontend can read results instantly.
+    """
+    while True:
+        logger.info("Background Refresh: Starting fetch cycle...")
+        try:
+            from ai_service.fetchers.orchestrator import MultiSourceFetcher
+            from dotenv import load_dotenv
+            load_dotenv()
+            
+            key = os.getenv("NEWSDATA_API_KEY")
+            fetcher = MultiSourceFetcher(news_api_key=key)
+            results = fetcher.poll_all_sources()
+            
+            output = {
+                "success": True,
+                "last_updated": datetime.datetime.now().isoformat(),
+                "data": results
+            }
+            
+            # Ensure data dir exists
+            os.makedirs(os.path.dirname(REALTIME_DATA_FILE), exist_ok=True)
+            
+            with open(REALTIME_DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(output, f, indent=2)
+                
+            logger.info(f"Background Refresh: Successfully updated {REALTIME_DATA_FILE}")
+            
+        except Exception as e:
+            logger.error(f"Background Refresh ERROR: {e}")
+            
+        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
+
+@app.on_event("startup")
+async def startup_event():
+    """Start the background task when API begins"""
+    asyncio.create_task(background_refresh_task())
+
+@app.get("/api/realtime/news", tags=["Fetching"])
+async def get_realtime_news():
+    """
+    Returns the latest AI-processed news from the local cache.
+    Extremely fast - no AI processing delay.
+    """
+    if not os.path.exists(REALTIME_DATA_FILE):
+        return {"success": False, "message": "Real-time data not yet generated. Please wait for background task."}
+        
+    try:
+        with open(REALTIME_DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 # Run server
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    
     uvicorn.run(
         "ai_service.api:app",
         host="0.0.0.0",

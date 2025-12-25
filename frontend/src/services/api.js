@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const fetchReports = async () => {
     try {
@@ -24,12 +24,13 @@ export const fetchSummaries = async () => {
 
 export const submitReport = async (data) => {
     try {
+        const isFormData = data instanceof FormData;
         const response = await fetch(`${API_URL}/reports/`, {
             method: 'POST',
-            headers: {
+            headers: isFormData ? {} : {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data),
+            body: isFormData ? data : JSON.stringify(data),
         });
         if (!response.ok) throw new Error('Failed to submit report');
         return await response.json();
