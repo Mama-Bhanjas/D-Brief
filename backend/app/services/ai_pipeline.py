@@ -60,4 +60,43 @@ class AIPipeline:
             print(f"Error calling AI service (summarize): {e}")
             return ""
 
+    def verify_news(self, text: str, source_url: str = None) -> dict:
+        """
+        Verifies news credibility via AI Service.
+        """
+        try:
+            payload = {"text": text, "source_url": source_url}
+            response = requests.post(f"{self.base_url}/api/verify/news", json=payload)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Error calling AI service (verify_news): {e}")
+            return {"success": False, "error": str(e)}
+
+    def verify_report(self, text: str) -> dict:
+        """
+        Verifies civic report validity via AI Service.
+        """
+        try:
+            payload = {"text": text}
+            response = requests.post(f"{self.base_url}/api/verify/report", json=payload)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Error calling AI service (verify_report): {e}")
+            return {"success": False, "error": str(e)}
+
+    def fact_check(self, text: str) -> dict:
+        """
+        Performs deep verification (internet search) via AI Service.
+        """
+        try:
+            payload = {"text": text}
+            response = requests.post(f"{self.base_url}/api/verify/factcheck", json=payload)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Error calling AI service (fact_check): {e}")
+            return {"success": False, "error": str(e)}
+
 ai_pipeline = AIPipeline()

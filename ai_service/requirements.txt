@@ -20,6 +20,12 @@ python-multipart==0.0.6
 # ===============================
 nltk==3.8.1
 spacy==3.7.2
+beautifulsoup4>=4.12.2
+
+# ===============================
+# Web Search & Verification
+# ===============================
+duckduckgo-search>=4.1.1
 
 # ===============================
 # Clustering & Embeddings
