@@ -35,8 +35,9 @@ class EntityExtractor:
                 "ner", 
                 model=model_name, 
                 tokenizer=model_name, 
-                aggregation_strategy="max", # Use max for better handling of fragmented entities
-                device=self.model_device
+                aggregation_strategy="max", 
+                device=self.model_device,
+                model_kwargs={"use_safetensors": True}
             )
             logger.info(f"NER model loaded successfully on {self.device}")
         except Exception as e:

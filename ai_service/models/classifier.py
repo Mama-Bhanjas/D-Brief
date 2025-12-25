@@ -27,7 +27,7 @@ class CategoryClassifier:
     
     def __init__(
         self,
-        model_name: str = "valhalla/distilbart-mnli-12-1",
+        model_name: str = "facebook/bart-large-mnli",
         categories: Optional[List[str]] = None,
         device: Optional[str] = None
     ):
@@ -48,7 +48,7 @@ class CategoryClassifier:
         
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
+            self.model = AutoModelForSequenceClassification.from_pretrained(model_name, use_safetensors=True)
             self.model.to(self.device)
             self.model.eval()
             

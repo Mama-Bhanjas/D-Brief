@@ -27,7 +27,7 @@ class VerificationPipeline:
     def __init__(
         self,
         news_model_name: str = "hamzab/roberta-fake-news-classification",
-        report_model_name: str = "valhalla/distilbart-mnli-12-1",
+        report_model_name: str = "facebook/bart-large-mnli",
         use_cache: bool = True,
         device: Optional[str] = None
     ):
@@ -52,7 +52,7 @@ class VerificationPipeline:
         logger.info(f"Loading News Classifier: {news_model_name}")
         try:
             self.news_tokenizer = AutoTokenizer.from_pretrained(news_model_name)
-            self.news_model = AutoModelForSequenceClassification.from_pretrained(news_model_name)
+            self.news_model = AutoModelForSequenceClassification.from_pretrained(news_model_name, use_safetensors=True)
             self.news_model.to(self.device)
             self.news_model.eval()
 

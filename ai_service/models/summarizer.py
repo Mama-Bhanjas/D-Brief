@@ -35,7 +35,7 @@ class TextSummarizer:
         
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name, use_safetensors=True)
             self.model.to(self.device)
             self.model.eval()
             logger.info(f"Summarizer loaded successfully on {self.device}")
@@ -68,9 +68,14 @@ class TextSummarizer:
             }
         
         try:
+            # T5 models need "summarize: " prefix
+            input_text = cleaned_text
+            if "t5" in self.model.config.model_type.lower():
+                input_text = "summarize: " + cleaned_text
+            
             # Tokenize input
             inputs = self.tokenizer(
-                cleaned_text,
+                input_text,
                 max_length=1024,
                 truncation=True,
                 return_tensors="pt"

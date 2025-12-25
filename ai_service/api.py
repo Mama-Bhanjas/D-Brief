@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from loguru import logger
 import uvicorn
+import datetime
+import os
 
 from ai_service.pipelines.classify import ClassificationPipeline
 from ai_service.pipelines.summarize import SummarizationPipeline
@@ -16,6 +18,8 @@ from ai_service.pipelines.verification import VerificationPipeline
 from ai_service.pipelines.fact_check import FactCheckPipeline
 from ai_service.pipelines.processor import UnifiedProcessor
 from ai_service.utils import setup_logging
+import asyncio
+import json
 
 
 # Initialize logging
@@ -44,6 +48,8 @@ clustering_pipeline = None
 verification_pipeline = None
 factcheck_pipeline = None
 unified_processor = None
+REALTIME_DATA_FILE = "ai_service/data/realtime_news.json"
+REFRESH_INTERVAL_SECONDS = 86400 # Refresh news once per day (every 24 hours)
 
 
 # Request/Response Models
@@ -476,8 +482,96 @@ async def process_upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/fetch/all", tags=["Fetching"])
+async def fetch_all_intelligence(news_api_key: Optional[str] = None):
+    """
+    Trigger the 4-Level Multi-Source Fetcher.
+    Polls BIPAD, ReliefWeb, USGS, and NewsData.io,
+    then runs AI verification on the news.
+    """
+    from ai_service.fetchers.orchestrator import MultiSourceFetcher
+    from dotenv import load_dotenv
+    
+    load_dotenv() # Load variables from .env
+    
+    # Priority: Function Argument -> Env Var -> Placeholder
+    key = news_api_key or os.getenv("NEWSDATA_API_KEY")
+    
+    if not key or key == "your_api_key_here":
+        logger.warning("Using free tier/public APIs where possible. NewsData.io requires a valid key.")
+        
+    fetcher = MultiSourceFetcher(news_api_key=key)
+    try:
+        results = fetcher.poll_all_sources()
+        return {
+            "success": True, 
+            "timestamp": datetime.datetime.now().isoformat(),
+            "data": results
+        }
+    except Exception as e:
+        logger.error(f"Fetch Cycle Failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def background_refresh_task():
+    """
+    Periodic task to refresh disaster intelligence from all sources.
+    Saves to a local file so the frontend can read results instantly.
+    """
+    while True:
+        logger.info("Background Refresh: Starting fetch cycle...")
+        try:
+            from ai_service.fetchers.orchestrator import MultiSourceFetcher
+            from dotenv import load_dotenv
+            load_dotenv()
+            
+            key = os.getenv("NEWSDATA_API_KEY")
+            fetcher = MultiSourceFetcher(news_api_key=key)
+            results = fetcher.poll_all_sources()
+            
+            output = {
+                "success": True,
+                "last_updated": datetime.datetime.now().isoformat(),
+                "data": results
+            }
+            
+            # Ensure data dir exists
+            os.makedirs(os.path.dirname(REALTIME_DATA_FILE), exist_ok=True)
+            
+            with open(REALTIME_DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(output, f, indent=2)
+                
+            logger.info(f"Background Refresh: Successfully updated {REALTIME_DATA_FILE}")
+            
+        except Exception as e:
+            logger.error(f"Background Refresh ERROR: {e}")
+            
+        await asyncio.sleep(REFRESH_INTERVAL_SECONDS)
+
+@app.on_event("startup")
+async def startup_event():
+    """Start the background task when API begins"""
+    asyncio.create_task(background_refresh_task())
+
+@app.get("/api/realtime/news", tags=["Fetching"])
+async def get_realtime_news():
+    """
+    Returns the latest AI-processed news from the local cache.
+    Extremely fast - no AI processing delay.
+    """
+    if not os.path.exists(REALTIME_DATA_FILE):
+        return {"success": False, "message": "Real-time data not yet generated. Please wait for background task."}
+        
+    try:
+        with open(REALTIME_DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # Run server
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    
     uvicorn.run(
         "ai_service.api:app",
         host="0.0.0.0",

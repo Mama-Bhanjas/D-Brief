@@ -29,9 +29,6 @@ class UnifiedProcessor:
         self._summarize = None
         self._ner = None
         self._verify = None
-        self.extractor = ContentExtractor()  # Initialize content extractor
-        
-        from ai_service.utils.content_extractor import ContentExtractor
         self.extractor = ContentExtractor()
         
         logger.info("Unified Processor initialized")
@@ -39,25 +36,54 @@ class UnifiedProcessor:
     @property
     def classify_p(self):
         if self._classify is None:
-            self._classify = ClassificationPipeline(device=self.device)
+            # Check for fine-tuned model
+            import os
+            model_path = "ai_service/models/custom_classifier"
+            # If not absolute, make it relative to cwd
+            if not os.path.exists(model_path):
+                model_path = "valhalla/distilbart-mnli-12-1" # Fallback
+            else:
+                 logger.info(f"Using fine-tuned Classification model from {model_path}")
+                 
+            self._classify = ClassificationPipeline(model_name=model_path, device=self.device)
         return self._classify
 
     @property
     def summarize_p(self):
         if self._summarize is None:
-            self._summarize = SummarizationPipeline(device=self.device)
+            import os
+            model_path = "ai_service/models/custom_summarizer" 
+            if not os.path.exists(model_path):
+                model_path = "sshleifer/distilbart-cnn-6-6"
+            else:
+                 logger.info(f"Using fine-tuned Summarization model from {model_path}")
+
+            self._summarize = SummarizationPipeline(model_name=model_path, device=self.device)
         return self._summarize
 
     @property
     def ner_p(self):
         if self._ner is None:
-            self._ner = NERPipeline(device=self.device)
+            import os
+            model_path = "ai_service/models/custom_ner"
+            if not os.path.exists(model_path):
+                # Fallback to default
+                self._ner = NERPipeline(device=self.device)
+            else:
+                logger.info(f"Using fine-tuned NER model from {model_path}")
+                self._ner = NERPipeline(ner_model=model_path, device=self.device)
         return self._ner
 
     @property
     def verify_p(self):
         if self._verify is None:
-            self._verify = VerificationPipeline() # Verification manages its own sub-pipelines
+            import os
+            ver_path = "ai_service/models/custom_verifier"
+            if os.path.exists(ver_path):
+                 logger.info(f"Using fine-tuned Verification model from {ver_path}")
+                 self._verify = VerificationPipeline(news_model_name=ver_path)
+            else:
+                self._verify = VerificationPipeline() 
         return self._verify
 
     def _clear_memory(self):
@@ -108,11 +134,26 @@ class UnifiedProcessor:
         logger.info(f"Processing report {request_id}")
         
         try:
-            # NEW: Check if text is actually a URL and extract content
+            # 0. Text Extraction
             extracted_text = None
             extraction_method = "direct"
+            actual_text = text
             
-            if self.extractor.is_url(text):
+            if file_bytes:
+                logger.info("Processing PDF file input")
+                extraction = self.extractor.extract_from_pdf(file_bytes)
+                if extraction["success"]:
+                    actual_text = extraction["text"]
+                    extracted_text = actual_text
+                    extraction_method = "pdf"
+                    logger.info(f"Successfully extracted {len(actual_text)} characters from PDF")
+                else:
+                    return {
+                        "success": False, 
+                        "report_id": request_id, 
+                        "error": f"PDF extraction failed: {extraction.get('error')}"
+                    }
+            elif self.extractor.is_url(text):
                 logger.info(f"Detected URL input, extracting content: {text}")
                 extraction = self.extractor.extract_from_url(text)
                 if extraction["success"]:
@@ -124,8 +165,13 @@ class UnifiedProcessor:
                 else:
                     logger.warning(f"URL extraction failed: {extraction.get('error')}, treating as regular text")
                     actual_text = text
-            else:
-                actual_text = text
+            
+            if not actual_text:
+                return {
+                    "success": False,
+                    "report_id": request_id,
+                    "error": "No content provided or extracted"
+                }
             
             # 1. Classification (General categories)
             cls_result = self.classify_p.process(actual_text)

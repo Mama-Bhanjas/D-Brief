@@ -79,10 +79,12 @@ class ContentExtractor:
             logger.error(f"PDF extraction failed: {e}")
             return {"success": False, "error": str(e)}
 
-    def is_url(self, source: str) -> bool:
+    def is_url(self, source: Optional[str]) -> bool:
         """Check if a string is a valid URL"""
+        if not source or not isinstance(source, str):
+            return False
         try:
             result = urlparse(source)
-            return all([result.scheme, result.netloc])
-        except ValueError:
+            return bool(result.scheme and result.netloc)
+        except Exception:
             return False
