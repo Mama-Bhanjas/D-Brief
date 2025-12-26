@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 console.log("Using API URL:", API_URL);
 
 export const fetchReports = async () => {
@@ -21,7 +21,7 @@ export const fetchSummaries = async () => {
         console.error("API Error:", error);
         return [];
     }
-}
+};
 
 export const submitReport = async (data) => {
     try {
